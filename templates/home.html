@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+    <html lang="en-us">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+      <title>Home</title>
+
+      <style>
+      #recording {
+        display:none;
+      }
+      </style>
+    </head>
+    <body>
+
+      <h2>Voice notes</h2>
+
+      {% if all_voice_notes %}
+      <p>Your voicenotes:
+      {% for id in all_voice_notes %}
+      <p><audio src="static/audio/{{id}}" controls></audio></p>
+      {% endfor %}
+      </p>
+      {% endif %}
+
+      <h3>Add a voice note</h3>
+
+        <button class="record">Record</button>
+        <button class="stop">Stop</button>
+        <section class="sound-clips"></section>
+
+      <form id="voice_note" action="{{server_path}}{{url_for('uploadNote')}}" method="POST" enctype="multipart/form-data">
+
+        <input type="file" id="recording" name="audio_recording">
+        <input type="hidden" name="suffix" id="suffix">
+        <br />
+        <input type="submit" value="Upload">
+      </form>  
+      </div>
+      <br />
+      <br />
+
+
+<script type="text/javascript">
+
+//adapted from https://github.com/mdn/dom-examples/tree/main/media/web-dictaphone
+const record = document.querySelector('.record');
+const stop = document.querySelector('.stop');
+const soundClips = document.querySelector('.sound-clips');
+
+// disable stop button while not recording
+stop.disabled = true;
+
+let audioCtx;
+
+//main block for doing the audio recording
+
+if (navigator.mediaDevices.getUserMedia) {
+    console.log('getUserMedia supported.');
+
+    const constraints = { audio: true };
+    let chunks = [];
+
+    let onSuccess = function(stream) {
+
+    //look for mp4 (safari, ios) then webm
+    //convert to mp3 serverside
+
+    var canRecordMp4 = MediaRecorder.isTypeSupported('audio/mp4');
+
+    if (canRecordMp4){
+        mediaRecorder = new MediaRecorder(stream, {mimeType : 'audio/mp4'});
+    } else{
+        mediaRecorder = new MediaRecorder(stream, {mimeType : 'audio/webm'});
+    }
+
+
+    record.onclick = function() {
+      mediaRecorder.start();
+      console.log(mediaRecorder.state);
+      console.log("recorder started");
+      record.style.background = "red";
+
+      stop.disabled = false;
+      record.disabled = true;
+    }
+
+    stop.onclick = function() {
+      mediaRecorder.stop();
+      console.log(mediaRecorder.state);
+      console.log("recorder stopped");
+      record.style.background = "";
+      record.style.color = "";
+
+      stop.disabled = true;
+      record.disabled = false;
+    }
+
+    mediaRecorder.onstop = function(e) {
+      console.log("data available after MediaRecorder.stop() called.");
+
+      //can't record another until you delete one
+      record.disabled = true;
+
+      const clipContainer = document.createElement('article');
+      const clipLabel = document.createElement('p');
+      const audio = document.createElement('audio');
+      const deleteButton = document.createElement('button');
+
+      clipContainer.classList.add('clip');
+      audio.setAttribute('controls', '');
+
+      clipName = "audio_recording";
+
+      clipContainer.appendChild(audio);
+      clipContainer.appendChild(deleteButton);
+      soundClips.appendChild(clipContainer);
+
+      const clip_id = soundClips.children.length;      
+      console.log("number of recordings",clip_id);      
+      audio.controls = true;
+
+      deleteButton.textContent = 'Delete';
+      deleteButton.className = 'delete';
+      deleteButton.id = 'delete_'+clip_id;
+
+
+      var blob;
+      let suffix = "webm";
+      let type = "";
+      if (canRecordMp4){
+         blob = new Blob(chunks, { "type" : "audio/mp4" });
+         suffix = "mp4";
+         type = "audio/mp4";
+      }else{
+         blob = new Blob(chunks, { "type" : "audio/webm" });
+         type = "audio/webm";
+      }
+
+      chunks = [];
+      const audioURL = window.URL.createObjectURL(blob);
+      audio.src = audioURL;
+      console.log("recorder stopped");
+
+      const formElem = document.querySelector('form');
+
+      // https://stackoverflow.com/a/74087012
+      const fileInput = document.querySelector('#recording');
+
+      // Create a new File object
+      const myFile = new File([blob], "audio_recording_"+clip_id+"."+suffix, {
+            type: type,
+            lastModified: new Date(),
+      });
+    
+      // Now let's create a DataTransfer to get a FileList
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(myFile);
+      console.log("fileInput",fileInput);
+      fileInput.files = dataTransfer.files;
+      ////
+
+      const s = document.querySelector('#suffix');
+      s.value = suffix;
+      console.log("suffix",suffix,canRecordMp4);
+
+      deleteButton.onclick = function(e) {
+        e.target.closest(".clip").remove();
+        record.disabled = false;
+        //delete it from the form
+        fileInput.files = null;
+      }
+
+    }
+
+    mediaRecorder.ondataavailable = function(e) {
+      chunks.push(e.data);
+    }
+  }
+
+  let onError = function(err) {
+    console.log('The following error occured: ' + err);
+  }
+
+  navigator.mediaDevices.getUserMedia(constraints).then(onSuccess, onError);
+
+} else {
+   console.log('getUserMedia not supported on your browser!');
+}
+</script>
+
+</html>
